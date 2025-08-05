@@ -1,0 +1,95 @@
+/* 📦 @media – 1000px dan past uchun moslashtirish */
+@media (max-width: 1000px) {
+    .responsive-container {
+      padding: 10px;
+    }
+  
+    .ant-table-wrapper {
+      overflow-x: auto; /* 📱 Jadvalni scroll qilish uchun */
+    }
+  
+    .ant-table {
+      font-size: 12px; /* kichikroq matn */
+    }
+  
+    .ant-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+  
+    .ant-radio-group {
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+  
+    .ant-input,
+    .ant-input-number,
+    .ant-select {
+      width: 100% !important;
+    }
+  
+    .ant-pagination {
+      justify-content: center;
+    }
+  
+    .ant-typography {
+      font-size: 16px;
+      text-align: center;
+    }
+  
+    /* 👉 agar .filter-btnlar bo‘lsa */
+    .filter-btns {
+      flex-direction: column;
+      gap: 6px;
+    }
+  }
+
+  /* 800px dan past ekranlar uchun media */
+@media (max-width: 800px) {
+    .responsive-container {
+      padding: 8px;
+    }
+  
+    .ant-table-wrapper {
+      overflow-x: auto; /* 📱 Jadval scroll bo‘lishi uchun */
+    }
+  
+    .ant-table {
+      font-size: 11px;
+    }
+  
+    .ant-btn {
+      font-size: 11px;
+      padding: 4px 6px;
+    }
+  
+    .ant-pagination {
+      justify-content: center;
+      margin-top: 12px;
+    }
+  
+    .ant-typography {
+      font-size: 16px;
+      text-align: center;
+    }
+  
+    .filter-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+  
+    .ant-input,
+    .ant-input-number,
+    .ant-select,
+    .ant-radio-group {
+      width: 100% !important;
+    }
+  
+    /* Modal kichik ekranlarda */
+    .ant-modal {
+      width: 95vw !important;
+    }
+  }
+  

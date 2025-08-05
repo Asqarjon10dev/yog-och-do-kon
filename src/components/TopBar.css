@@ -1,0 +1,42 @@
+.topbar-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f8fafd;
+    padding: 10px 20px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .currency-box {
+    display: flex;
+    align-items: center;
+  }
+  
+  .profile-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+  }
+  
+  .user-icon {
+    cursor: pointer;
+    color: #1f1f1f;
+  }
+  
+  .profile-menu {
+    position: absolute;
+    top: 35px;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 10px;
+    z-index: 10;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .logout {
+    color: red;
+    cursor: pointer;
+  }

@@ -1,0 +1,37 @@
+/* ModalHarajatlar.css */
+.expense-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: transparent !important;
+    
+  }
+  
+  .expense-container {
+    padding: 14px;
+    background: transparent !important;
+    border-radius: 12px;
+    width: 100%;
+  }
+  
+  .expense-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  
+  .expense-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 16px;
+    margin-top: 16px;
+  }
+  
+  .expense-table {
+    width: 100%;
+  }
+  
+  .expense-cards {
+    margin-top: 24px;
+  }

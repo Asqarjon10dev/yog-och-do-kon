@@ -1,0 +1,49 @@
+/* src/components/Sidebar.css */
+.sidebar {
+    width: 240px;
+    height: 100%;
+    background-image: url("../assets/image\ copy.png");
+    background-size: cover;
+    background-position: center;
+    color: white;
+    padding: 20px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    overflow-y: auto;
+  }
+  
+  .logo {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 30px;
+  }
+  
+  .sidebar ul {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .sidebar li {
+    margin: 12px 0;
+    cursor: pointer;
+  }
+
+  
+  .sidebar a {
+    display: block;
+    padding: 10px;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 18px;
+    border: 1px solid rgb(148, 55, 2);
+    border-radius: 5px;
+
+
+  }
+  .sidebar a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+  }
+  

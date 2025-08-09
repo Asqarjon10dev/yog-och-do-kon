@@ -27,11 +27,13 @@ const Home = () => {
   const { data, isLoading, refetch } = useGetAllProductsQuery();
   const [deleteProduct] = useDeleteProductMutation();
   const [addSale] = useAddSaleMutation();
-
+    const [currency, setCurrency] = useState("$");
   const [filterType, setFilterType] = useState("all");
   const [selectedList, setSelectedList] = useState([]);
   const [form] = Form.useForm();
   const [exchangeRate, setExchangeRate] = useState(null); // yoki 0 ham bo'ladi
+  const [searchTerm, setSearchTerm] = useState("");
+
 
   // ❌ Mahsulotni tanlangan ro‘yxatdan o‘chirish
 const removeSelectedItem = (code) => {
@@ -56,10 +58,30 @@ const removeSelectedItem = (code) => {
 
   const filteredProducts = useMemo(() => {
     if (!data?.innerData) return [];
-    if (filterType === "low") return data.innerData.filter((p) => p.quantity <= 5 && p.quantity > 0);
-    if (filterType === "finished") return data.innerData.filter((p) => p.quantity === 0);
-    return data.innerData;
-  }, [data, filterType]);
+  
+    let filtered = [...data.innerData];
+  
+    // filterType
+    if (filterType === "low") {
+      filtered = filtered.filter((p) => Number(p.totalKub) > 0 && Number(p.totalKub) < 5);
+    } else if (filterType === "finished") {
+      filtered = filtered.filter((p) => Number(p.totalKub) <= 0);
+    }
+  
+    // search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter((p) =>
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.code?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+  
+    return filtered;
+  }, [data, filterType, searchTerm]);
+  
+  
+
+
 
 
 
@@ -73,11 +95,13 @@ const removeSelectedItem = (code) => {
       {
         ...product,
         quantity: 1,
-        currency: product.currency,
+        currency: product.currency,           // Foydalanuvchi ko‘radigan valyuta
+        originalCurrency: product.currency,   // Asl valyuta shu bo‘lib qoladi!
         unit: product.unit,
       },
     ]);
   };
+  
 
   const updateSelectedItem = (code, field, value) => {
     setSelectedList((prev) =>
@@ -86,6 +110,18 @@ const removeSelectedItem = (code) => {
       )
     );
   };
+
+  const handleInputChange = (val, record) => {
+    const total = val * record.price;
+  
+    if (total > record.totalKub * record.price) {
+      toast.warning("Kiritilgan miqdor mavjud hajmdan ortiq. Iltimos, tekshiring.");
+      return;
+    }
+  
+    updateSelectedItem(record.code, "quantity", val);
+  };
+  
   const handleCurrencyChange = (index, newCurrency) => {
     const updated = [...selectedList];
     updated[index].currency = newCurrency;
@@ -95,24 +131,41 @@ const removeSelectedItem = (code) => {
   
 
   const calculateTotal = (item) => {
-    if (!exchangeRate) return 0; // API hali kelmagan bo‘lsa
+    if (!exchangeRate) return 0;
   
-    const price = item.currency === "$" ? item.sellPrice * exchangeRate : item.sellPrice;
-    const count =
-      item.unit === "kub"
-        ? ((item.width * item.height * item.length) / 1_000_000_000) * item.quantity
-        : item.quantity;
-    return price * count;
+    const count = Number(item.quantity);        // m³
+    if (isNaN(count)) return 0;
+  
+    // ❗ sotuv narxi ishlatiladi
+    const originalPrice = Number(item.sellPricePerKub ?? item.pricePerKub ?? 0);
+  
+    // Valyuta aylantirishni soddalashtirish:
+    // Ma'lumot bazadagi narx qaysi valutada bo‘lsa, o‘sha -> tanlangan currency ga o‘tkazamiz
+    let finalPrice = originalPrice;
+  
+    const fromDollar = item.originalCurrency === "$";
+    const toDollar   = item.currency === "$";
+  
+    if (exchangeRate && fromDollar && !toDollar) {
+      // $ -> so'm
+      finalPrice = originalPrice * exchangeRate;
+    } else if (exchangeRate && !fromDollar && toDollar) {
+      // so'm -> $
+      finalPrice = originalPrice / exchangeRate;
+    }
+  
+    return finalPrice * count;
   };
+  
+  
   
 
   const totalAmountAll = selectedList.reduce((sum, item) => sum + calculateTotal(item), 0);
 
   const onFinish = async (values) => {
     const prepared = selectedList.map((item) => {
-      const kub = item.unit === "kub"
-        ? ((item.width * item.height * item.length) / 1_000_000_000) * item.quantity
-        : 0;
+      const kub = item.quantity; // quantity = kub, to'g'ridan-to'g'ri foydalaniladi
+    
       return {
         productId: item._id,
         name: item.name,
@@ -120,12 +173,13 @@ const removeSelectedItem = (code) => {
         category: item.category,
         unit: item.unit,
         quantity: item.quantity,
-        kub,
-        price: item.sellPrice,
+        kub, // bu yuboriladi va backendda `totalKub` kamaytiriladi
+        price: item.sellPricePerKub,
         currency: item.currency,
-        cost: item.price,
+        cost: item.pricePerKub,
       };
     });
+    
 
     const paidAmount = values.paidAmount;
     const dueAmount = totalAmountAll - paidAmount;
@@ -141,17 +195,24 @@ const removeSelectedItem = (code) => {
       customerPhone: values.customerPhone,
     };
     
-
     const res = await addSale(payload);
+
     if (res?.data?.state) {
       toast.success("Sotuv bajarildi");
-      refetch();
       setSelectedList([]);
       form.resetFields();
+      await refetch(); // ✅ yangilangan mahsulotlar kelsin
     } else {
-      toast.error(res?.data?.message || "Xatolik yuz berdi");
+      toast.error(res?.data?.message || "Noma'lum xatolik yuz berdi");
     }
-  };
+    };
+       
+
+      // 💡 Shunchaki yangi `copy.innerData`dan foydalaning (agar kerak bo‘lsa)
+   
+    
+    
+
 
 const columns = [
   { title: "Nomi", dataIndex: "name", key: "name" },
@@ -159,17 +220,16 @@ const columns = [
   { title: "Kategoriya", dataIndex: "category", key: "category" },
   {
     title: "Hajm (kub)",
-    dataIndex: "height",
-    key: "height",
-    render: (text) => `${text?.toFixed(3)} m³`,
-  },
+    dataIndex: "totalKub",
+    render: (val) => {
+      const num = Number(val);
+      return `${num % 1 === 0 ? num : num.toFixed(3)} m³`;
+    }
+  }
+  
+  ,  
   {
-    title: "Miqdor",
-    dataIndex: "quantity",
-    key: "quantity",
-  },
-  {
-    title: "O‘lcham (m)",
+    title: "O‘lcham (eni b u)",
     key: "size",
     render: (record) => (
       <span>
@@ -177,43 +237,73 @@ const columns = [
       </span>
     ),
   },
-  {
-    title: "Narxi",
-    dataIndex: "sellPrice",
-    key: "sellPrice",
-    render: (_, record) => {
-      const currency = record.currency === "$" ? "$" : "so'm";
-      return `${record.sellPrice} ${currency}`;
-    },
+ // columns dagi "Narxi"
+{
+  title: "Narxi",
+  render: (item) =>
+    item.sellPricePerKub != null
+      ? `${item.sellPricePerKub.toLocaleString()} ${item.currency}`
+      : item.pricePerKub != null
+        ? `${item.pricePerKub.toLocaleString()} ${item.currency}`
+        : item.price != null
+          ? `${item.price.toLocaleString()} ${item.currency}`
+          : "-",
+},
+
+{
+  title: "Umumiy",
+  render: (item) => {
+    const kub = Number(item.totalKub ?? 0);
+    const price = Number(item.sellPricePerKub ?? item.pricePerKub ?? 0);
+    if (!kub || !price) return "-";
+    return `${(kub * price).toLocaleString()} ${item.currency}`;
   },
-  {
-    title: "Umumiy",
-    key: "total",
-    render: (_, record) => `${calculateTotal(record).toLocaleString()} so'm`,
-  },
+},
+
+  
   {
     title: "Amallar",
-    key: "action",
-    render: (_, record) => (
-      <Space>
-        <Button type="primary" onClick={() => handleSelectProduct(record)}>
+    render: (_, record) => {
+      const isTugagan = record.totalKub <= 0;
+  
+      return (
+        <Button
+          type="primary"
+          disabled={isTugagan}
+          onClick={() => handleSelectProduct(record)}
+        >
           Tanlash
         </Button>
-        
-      </Space>
-    ),
-  },
+      );
+    },
+  }
+  
 ];
 
   return (
     <div>
-      <Typography.Title level={2}>Mahsulotlar</Typography.Title>
-      
-      <Radio.Group value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ marginBottom: 16 }}>
-        <Radio.Button value="all">Barchasi</Radio.Button>
-        <Radio.Button value="low">Kam qolgan</Radio.Button>
-        <Radio.Button value="finished">Tugagan</Radio.Button>
-      </Radio.Group>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+  <Typography.Title level={3} style={{ marginBottom: 16}}>
+    Mahsulotlar
+  </Typography.Title>
+
+  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+  <Input.Search
+  placeholder="Mahsulot qidirish"
+  allowClear
+  style={{ width: 200 }}
+  value={searchTerm}
+  onChange={(e) => setSearchTerm(e.target.value)}
+/>
+
+    <Radio.Group value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+      <Radio.Button value="all">Barchasi</Radio.Button>
+      <Radio.Button value="low">Kam qolgan</Radio.Button>
+      <Radio.Button value="finished">Tugagan</Radio.Button>
+    </Radio.Group>
+  </div>
+</div>
+
 
       <Table dataSource={filteredProducts} columns={columns} rowKey="_id" loading={isLoading} pagination={{ pageSize: 6 }} />
 
@@ -221,89 +311,88 @@ const columns = [
         <div style={{ marginTop: 32 }}>
           <Typography.Title level={4}>Tanlangan mahsulotlar</Typography.Title>
           <Table
-            dataSource={selectedList}
-            rowKey="_id"
-            columns={[
-              { title: "Kodi", dataIndex: "code" },
-              { title: "Nomi", dataIndex: "name" },
-              {
-                title: "Valyuta",
-                render: (text, record, rowIndex) => (
-                  <Select
-                    value={record.currency}
-                    onChange={(val) => handleCurrencyChange(rowIndex, val)}
-                    style={{ width: 80 }}
-                  >
-                    <Select.Option value="so'm">$</Select.Option>
-                    <Select.Option value="$">so'm</Select.Option>
-                  </Select>
-                ),
-              },
-              
-              {
-                title: "O‘lchov",
-                render: (_, record) => (
-                  <Select
-                    value={record.unit}
-                    onChange={(val) => updateSelectedItem(record.code, "unit", val)}
-                    style={{ width: 100 }}
-                    options={[{ value: "dona", label: "dona" }, { value: "kub", label: "kub" }]}
-                  />
-                ),
-              },
-              {
-                title: "Miqdor",
-                render: (_, record) => (
-                  <InputNumber
-                    min={1}
-                    value={record.quantity}
-                    onChange={(val) => updateSelectedItem(record.code, "quantity", val)}
-                  />
-                ),
-              },
-              {
-                title: "Hajm (kub)",
-                render: (_, record) =>
-                  record.unit === "kub"
-                    ? (((record.width * record.height * record.length) / 1_000_000_000) * record.quantity).toFixed(3) + " m³"
-                    : "-",
-              },
-              {
-                title: "Umumiy",
-                render: (_, record) => {
-                  const total = calculateTotal(record);
-                  const currency = record.currency;
-                  return (
-                    <b>
-                      {currency === "$"
-                        ? `${total.toLocaleString()} so'm`
-                        : `${total.toLocaleString()} $`}
-                    </b>
-                  );
-                },
-              },
-              {
-                title: "Amal",
-                render: (_, record) => (
-                  <Button danger onClick={() => removeSelectedItem(record.code)}>
-                    ❌
-                  </Button>
-                ),
-              }
-              
-              
-            ]}
-            pagination={false}
-            bordered
-          />
+  dataSource={selectedList}
+  rowKey="_id"
+  columns={[
+    { title: "Kodi", dataIndex: "code" },
+    { title: "Nomi", dataIndex: "name" },
+    {
+      title: "Valyuta",
+      render: (_, record) => <span>{record.currency}</span>
+    },
+    {
+      title: "Miqdor (m³)",
+      render: (_, record) => (
+        <InputNumber
+        min={0.001}
+        step={0.001}
+        value={record.quantity}
+        formatter={(value) => {
+          const number = Number(value);
+          return number % 1 === 0 ? `${number}` : number.toFixed(3);
+        }}
+        parser={(value) => value.replace(/[^\d.]/g, '')}
+        onChange={(val) => {
+          if (val > record.totalKub) {
+            const displayValue =
+              Number(record.totalKub) % 1 === 0
+                ? Number(record.totalKub)
+                : Number(record.totalKub).toFixed(3);
+      
+            toast.warning(`Omborda faqat ${displayValue} m³ mahsulot bor`);
+            updateSelectedItem(record.code, "quantity", record.totalKub);
+          } else {
+            updateSelectedItem(record.code, "quantity", val);
+          }
+        }}
+      />
+      
+      )
+    },
+    {
+      title: "Hajm (kub)",
+      render: (_, record) => {
+        const totalKub = Number(record.quantity);
+        const formattedKub = totalKub % 1 === 0 ? totalKub : totalKub.toFixed(3);
+        return `${formattedKub} m³`;
+      },
+    },
+    {
+      title: "Umumiy",
+      render: (_, record) => {
+        const total = calculateTotal(record);
+        return (
+          <b>
+            {record.currency === "so'm"
+              ? `${total.toLocaleString()} so'm`
+              : `${total.toLocaleString()} $`}
+          </b>
+        );
+      },
+    },
+    {
+      title: "Amal",
+      render: (_, record) => (
+        <Button danger onClick={() => removeSelectedItem(record.code)}>
+          ❌
+        </Button>
+      ),
+    }
+  ]}
+  pagination={false}
+  bordered
+/>
+
 
           <Divider />
           <Typography.Text strong>
-    Umumiy summa:{" "}
-    {selectedList[0].currency === "$"
-      ? `${totalAmountAll.toLocaleString()} so'm`
-      : `${totalAmountAll.toLocaleString()} $`}
-  </Typography.Text>
+  Umumiy summa:{" "}
+  {selectedList[0]?.currency === "so'm"
+    ? `${totalAmountAll.toLocaleString()} so'm`
+    : `${totalAmountAll.toLocaleString()} $`}
+</Typography.Text>
+
+
 
           <Form layout="vertical" form={form} onFinish={onFinish} style={{ marginTop: 16 }}>
             <Form.Item
@@ -321,14 +410,33 @@ const columns = [
             >
               <Input placeholder="Masalan: 998901234567" />
             </Form.Item>
-
             <Form.Item
-              label="To‘langan summa"
-              name="paidAmount"
-              rules={[{ required: true, message: "To‘langan summani kiriting" }]}
-            >
-              <InputNumber placeholder="Masalan: 100000" style={{ width: "100%" }} />
-            </Form.Item>
+  label="To‘langan summa"
+  name="paidAmount"
+  rules={[{ required: true, message: "To‘langan summani kiriting" }]}
+>
+  <InputNumber
+    min={0}
+    max={totalAmountAll}
+    value={form.getFieldValue("paidAmount")}
+    onChange={(value) => {
+      if (value > totalAmountAll) {
+        toast.warning("To‘langan summa umumiy summadan oshmasligi kerak!");
+        form.setFieldsValue({ paidAmount: totalAmountAll });
+      } else {
+        form.setFieldsValue({ paidAmount: value });
+      }
+    }}
+    formatter={(value) =>
+      value && !isNaN(value) ? `${Number(value).toLocaleString()} ${currency}` : ""
+    }
+    parser={(value) => value.replace(/[^\d]/g, "")}
+    placeholder="Masalan: 100000"
+    style={{ width: "100%" }}
+  />
+</Form.Item>
+
+
 
             <Form.Item noStyle shouldUpdate={(prev, curr) => prev.paidAmount !== curr.paidAmount}>
               {({ getFieldValue }) => {

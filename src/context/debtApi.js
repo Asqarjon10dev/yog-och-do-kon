@@ -1,28 +1,34 @@
-import { api } from "./api";
+import { api } from "./api"; // asosiy api faylingiz
 
 export const debtApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getAllDebts: builder.query({
-      query: () => "/debt/all",
-      providesTags: ["Debts"],
+      query: () => "/debtAll",
     }),
-    addDebt: builder.mutation({
-      query: (body) => ({
-        url: "/debt/add",
-        method: "POST",
-        body,
+    deleteDebt: builder.mutation({
+      query: (id) => ({
+        url: `/debtDelete/${id}`,
+        method: "DELETE",
       }),
-      invalidatesTags: ["Debts"],
     }),
     payDebt: builder.mutation({
       query: ({ id, amount }) => ({
-        url: `/debt/pay/${id}`,
+        url: `/payDebt/${id}`,
         method: "PATCH",
-        body: { amount }, // ✅ To‘g‘ri nom
+        body: { amount }, // endi bu joyga to'g'ri qiymat tushadi
       }),
-      invalidatesTags: ["Debts"],
+      invalidatesTags: ["Debt"],
     }),
+    bulkPayDebts: builder.mutation({
+      query: (debtIds) => ({
+        url: "/payDebtAll",
+        method: "POST",
+        body: { debtIds }, // qarzlar ro'yxatini yuboradi
+      }),
+      invalidatesTags: ["Debt"],
+    }),
+    
   }),
 });
 
-export const { useGetAllDebtsQuery, useAddDebtMutation, usePayDebtMutation } = debtApi;
+export const { useGetAllDebtsQuery, useDeleteDebtMutation, usePayDebtMutation, useBulkPayDebtsMutation } = debtApi;

@@ -5,6 +5,8 @@ import {
   useGetSalaryHistoryQuery,
   useGetSalaryByEmployeeIdQuery,
 } from "../context/employeeApi";
+import  formatDate from "../utils/formatDate";
+
 
 const OylikTarixi = () => {
   const role = localStorage.getItem("role");
@@ -58,15 +60,8 @@ const OylikTarixi = () => {
     },
     {
       title: "Vaqt",
-      render: (item) =>
-        new Date(item.date).toLocaleString("uz-UZ", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-    },
+      render: (item) => formatDate(item.date),
+    }
   ];
 
   return (

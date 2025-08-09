@@ -1,48 +1,51 @@
+// 📁 context/employeeApi.js
 import { api } from "./api";
 
-export const employeeApi = api.injectEndpoints({
-  endpoints: (builder) => ({
-    addEmployee: builder.mutation({
-      query: (data) => ({
-        url: "/employee/add",
-        method: "POST",
-        body: data,
+  export const employeeApi = api.injectEndpoints({
+    endpoints: (builder) => ({
+      getAllEmployees: builder.query({
+        query: () => "/employee/all",
+        providesTags: ["Employees"],
       }),
-    }),
-    getAllEmployees: builder.query({
-      query: () => "/employee/all",
-    }),
-    giveSalary: builder.mutation({
-      query: (data) => ({
-        url: "/employee/salary",
-        method: "POST",
-        body: data,
+  
+      getSalaryHistory: builder.query({
+        query: (params) => ({ url: "/employee/salaryHistory", method: "GET", params }),
+        providesTags: ["SalaryHistory"],
       }),
-    }),
-    getSalaryHistory: builder.query({
-      query: (params) => ({
-        url: "/employee/salaryHistory",
-        method: "GET",
-        params,
+  
+      getAdvanceHistory: builder.query({
+        query: () => ({ url: "/employee/advance/history", method: "GET" }),
+        providesTags: ["AdvanceHistory"],
       }),
-    }),
-    employeeLogin: builder.mutation({
-      query: (body) => ({
-        url: "/employee/login",
-        method: "POST",
-        body,
+  
+      addEmployee: builder.mutation({
+        query: (data) => ({ url: "/employee/add", method: "POST", body: data }),
+        invalidatesTags: ["Employees"],
       }),
-    }),
-    
-// 📁 context/employeeApi.js
-// 📁 context/employeeApi.js yoki salaryApi.js
-getSalaryByEmployeeId: builder.query({
-  query: (employeeId) => `/salary/by-employee/${employeeId}`,
-}),
-
-
+  
+      giveSalary: builder.mutation({
+        query: (data) => ({ url: "/employee/salary", method: "POST", body: data }),
+        invalidatesTags: ["SalaryHistory", "Employees"],
+      }),
+  
+      giveAdvance: builder.mutation({
+        query: (data) => ({ url: "/employee/advance", method: "POST", body: data }),
+        invalidatesTags: ["AdvanceHistory", "Employees"],
+      }),
+useEmployeeLoginMutation: builder.mutation({
+  query: (data) => ({
+    url: "/employee/login",
+    method: "POST",
+    body: data,
   }),
-});
+  invalidatesTags: ["Employees"],
+})
+
+   
+    }),
+
+  }); 
+
 
 export const {
   useAddEmployeeMutation,
@@ -50,5 +53,8 @@ export const {
   useGiveSalaryMutation,
   useGetSalaryHistoryQuery,
   useEmployeeLoginMutation,
-  useGetSalaryByEmployeeIdQuery
+  useGetSalaryByEmployeeIdQuery,
+  // ⬇️ Yangi hooklar
+  useGiveAdvanceMutation,
+  useGetAdvanceHistoryQuery,
 } = employeeApi;

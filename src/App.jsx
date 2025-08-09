@@ -14,7 +14,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Mahsulotlar from "./pages/Mahsulotlar";
-import Sotuvlar from "./pages/Sotuvlar";
+import Sotuvlar from "./pages/SotishTarix";
 import Qarzdorlar from "./pages/Qarzdorlar";
 import Ishchilar from "./pages/Ishchilar";
 import Harajatlar from "./pages/Harajatlar";
@@ -41,7 +41,7 @@ const Layout = ({ children, role }) => {
           <TopBar />
         </div>
       )}
-      <div style={{ display: "flex", paddingTop: isLoginPage ? 0 : 70 }}>
+      <div style={{ display: "flex", paddingTop: isLoginPage ? 0 : 25 }}>
         {!isLoginPage && role === "admin" && <Sidebar />}
         <div
           style={{
@@ -119,6 +119,8 @@ const App = () => {
               </PrivateRoute>
             }
           />
+
+
           <Route
             path="/mahsulotlar"
             element={

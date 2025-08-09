@@ -1,140 +1,127 @@
-import React, { useEffect, useState, useMemo } from "react";
+// src/pages/ModalHarajatlar.jsx
+import React, { useMemo, useState } from "react";
 import {
-  Modal,
-  Row,
-  Col,
-  Card,
-  Table,
-  Button,
-  Form,
-  Input,
-  Select,
-  DatePicker,
-  Typography,
-  Popconfirm,
-  Radio,
-  message,
+  Modal, Row, Col, Card, Table, Button, Form, Input, Select,
+  DatePicker, Typography, Popconfirm, Radio, Divider, message,
 } from "antd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
 import { PlusOutlined, CloseOutlined } from "@ant-design/icons";
-import {
-  useGetAllExpensesQuery,
-  useAddExpenseMutation,
-  useDeleteExpenseMutation,
-} from "../context/harajatApi";
 import { useNavigate } from "react-router-dom";
+import {
+  useGetAllExpensesQuery, useAddExpenseMutation, useDeleteExpenseMutation,
+} from "../context/harajatApi";
+import {
+  useGetExpenseCategoriesQuery, useAddExpenseCategoryMutation,
+} from "../context/catagoryharajatApi";
 import "./ModalHarajatlar.css";
 
 dayjs.extend(isBetween);
-
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
-const { Option } = Select;
 
-const ModalHarajatlar = ({ isOpen, onClose }) => {
+const ModalHarajatlar = () => {
+  // Expenses
   const { data, isLoading, refetch } = useGetAllExpensesQuery();
   const [addExpense] = useAddExpenseMutation();
   const [deleteExpense] = useDeleteExpenseMutation();
-  const [form] = Form.useForm();
+  const expenses = data?.innerData || [];             // ✅ qo‘shildi
 
+  // Categories
+  const { data: catRes, isLoading: catsLoading, refetch: refetchCats } =
+    useGetExpenseCategoriesQuery();
+  const [createCategory, { isLoading: creatingCat }] =
+    useAddExpenseCategoryMutation();
+  const categories = catRes?.innerData || [];
+
+  // UI
+  const [form] = Form.useForm();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [filteredData, setFilteredData] = useState([]);
   const [dateFilter, setDateFilter] = useState("month");
   const [range, setRange] = useState([]);
-  const [categoryFilter, setCategoryFilter] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState(null);
+  const [catModalOpen, setCatModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
   const navigate = useNavigate();
 
-  const expenses = data?.innerData || [];
-
-  useEffect(() => {
-    if (!Array.isArray(expenses)) return;
-  
+  // Filtered data
+  const filteredData = useMemo(() => {
     let result = [...expenses];
     const today = dayjs();
-  
     if (dateFilter === "today") {
-      result = result.filter((e) => dayjs(e.createdAt).isSame(today, "day"));
+      result = result.filter(e => dayjs(e.createdAt).isSame(today, "day"));
     } else if (dateFilter === "week") {
-      result = result.filter((e) => dayjs(e.createdAt).isAfter(today.subtract(7, "day")));
+      result = result.filter(e => dayjs(e.createdAt).isAfter(today.subtract(7, "day")));
     } else if (dateFilter === "month") {
-      result = result.filter((e) => dayjs(e.createdAt).isSame(today, "month"));
-    } else if (
-      dateFilter === "range" &&
-      Array.isArray(range) &&
-      range.length === 2 &&
-      range[0] &&
-      range[1]
-    ) {
-      result = result.filter((e) =>
-        dayjs(e.createdAt).isBetween(range[0], range[1], null, "[]")
-      );
+      result = result.filter(e => dayjs(e.createdAt).isSame(today, "month"));
+    } else if (dateFilter === "range" && range?.length === 2 && range[0] && range[1]) {
+      result = result.filter(e => dayjs(e.createdAt).isBetween(range[0], range[1], null, "[]"));
     }
-  
-    if (Array.isArray(categoryFilter) && categoryFilter.length) {
-      result = result.filter((e) => categoryFilter.includes(e.category));
+    if (categoryFilter && categoryFilter !== "ALL") {
+      result = result.filter(e => e.category === categoryFilter);
     }
-  
-    // 🔒 Bu yerda filterlangan natija asl expenses bilan bir xilmi – shuni tekshirib chiqamiz
-    const isSame = JSON.stringify(result) === JSON.stringify(filteredData);
-    if (!isSame) {
-      setFilteredData(result);
-    }
+    return result;
   }, [expenses, dateFilter, range, categoryFilter]);
-  
-  const total = useMemo(() => {
-    return filteredData.reduce((acc, cur) => acc + Number(cur.amount), 0);
-  }, [filteredData]);
 
+  // Stats
+  const total = useMemo(
+    () => filteredData.reduce((acc, cur) => acc + Number(cur.amount || 0), 0),
+    [filteredData]
+  );
   const categoryStats = useMemo(() => {
     const stats = {};
-    filteredData.forEach((e) => {
-      stats[e.category] = (stats[e.category] || 0) + Number(e.amount);
+    filteredData.forEach(e => {
+      stats[e.category] = (stats[e.category] || 0) + Number(e.amount || 0);
     });
     return stats;
   }, [filteredData]);
-
   const topCategory = useMemo(() => {
-    return Object.entries(categoryStats).sort((a, b) => b[1] - a[1])[0];
+    const arr = Object.entries(categoryStats);
+    return arr.length ? arr.sort((a, b) => b[1] - a[1])[0] : null;
   }, [categoryStats]);
 
+  // Handlers
   const handleAdd = async () => {
     try {
       const values = await form.validateFields();
       await addExpense(values).unwrap();
       message.success("Xarajat qo‘shildi");
-      form.resetFields();
       setShowAddModal(false);
+      form.resetFields();
+      refetch();
+    } catch (e) {
+      message.error(e?.data?.message || "Xatolik yuz berdi");
+    }
+  };
+  const handleDelete = async (id) => {
+    try {
+      await deleteExpense(id).unwrap();
+      message.success("O‘chirildi");
       refetch();
     } catch {
-      message.error("Xatolik yuz berdi");
+      message.error("O‘chirishda xatolik");
+    }
+  };
+  const handleCreateCategory = async () => {
+    const name = (newCatName || "").trim();
+    if (!name) return message.warning("Kategoriya nomini kiriting");
+    try {
+      await createCategory({ name }).unwrap();
+      message.success("Kategoriya qo‘shildi");
+      setCatModalOpen(false);
+      setNewCatName("");
+      await refetchCats();
+      form.setFieldsValue({ category: name });
+    } catch (e) {
+      message.error(e?.data?.message || "Kategoriya qo‘shishda xatolik");
     }
   };
 
-  const handleDelete = async (id) => {
-    await deleteExpense(id);
-    refetch();
-  };
-
   const columns = [
-    {
-      title: "Summa",
-      dataIndex: "amount",
-      render: (val) => `${val.toLocaleString()} so‘m`,
-    },
-    {
-      title: "Kategoriya",
-      dataIndex: "category",
-    },
-    {
-      title: "Sabab",
-      dataIndex: "reason",
-    },
-    {
-      title: "Sana",
-      dataIndex: "createdAt",
-      render: (val) => dayjs(val).format("YYYY-MM-DD HH:mm"),
-    },
+    { title: "Summa", dataIndex: "amount", render: v => `${Number(v || 0).toLocaleString()} so‘m` },
+    { title: "Kategoriya", dataIndex: "category" },
+    { title: "Sabab", dataIndex: "reason" },
+    { title: "Sana", dataIndex: "createdAt", render: v => dayjs(v).format("YYYY-MM-DD HH:mm") },
     {
       title: "Amal",
       render: (_, rec) => (
@@ -150,10 +137,11 @@ const ModalHarajatlar = ({ isOpen, onClose }) => {
       <div className="expense-wrapper">
         <div className="expense-container">
           <div className="expense-header">
-            <Title level={3}>Xarajatlar <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowAddModal(true)}>
+            <Title level={3}>
+              Xarajatlar{" "}
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowAddModal(true)}>
                 Qo‘shish
-              </Button>  
-              
+              </Button>
             </Title>
             <Button type="text" icon={<CloseOutlined style={{ fontSize: 20 }} />} onClick={() => navigate("/")} />
           </div>
@@ -161,9 +149,11 @@ const ModalHarajatlar = ({ isOpen, onClose }) => {
           <Row gutter={16} className="expense-cards">
             <Col span={6}><Card title="Jami xarajat">{total.toLocaleString()} so‘m</Card></Col>
             <Col span={6}><Card title="Kategoriya soni">{Object.keys(categoryStats).length} ta</Card></Col>
-            <Col span={12}><Card title="Eng ko‘p sarflangan">
-              {topCategory ? `${topCategory[0]} — ${topCategory[1].toLocaleString()} so‘m` : "Ma’lumot yo‘q"}
-            </Card></Col>
+            <Col span={12}>
+              <Card title="Eng ko‘p sarflangan">
+                {topCategory ? `${topCategory[0]} — ${Number(topCategory[1]).toLocaleString()} so‘m` : "Ma’lumot yo‘q"}
+              </Card>
+            </Col>
           </Row>
 
           <div className="expense-filters">
@@ -177,16 +167,25 @@ const ModalHarajatlar = ({ isOpen, onClose }) => {
             {dateFilter === "range" && <RangePicker onChange={(val) => setRange(val)} />}
 
             <Select
-              mode="multiple"
-              allowClear
+              style={{ width: 200, marginLeft: 16 }}
               placeholder="Kategoriya tanlang"
-              style={{ minWidth: 220 }}
+              value={categoryFilter ?? "ALL"}
+              showSearch
               onChange={setCategoryFilter}
-            >
-              {["Oziq-ovqat", "Transport", "Ijara", "Kommunal", "Boshqa"].map((cat) => (
-                <Option key={cat} value={cat}>{cat}</Option>
-              ))}
-            </Select>
+              loading={catsLoading}
+              options={[
+                { label: "Barchasi", value: "ALL" },
+                ...categories.map(c => ({ label: c.name, value: c.name })),
+              ]}
+              dropdownRender={(menu) => (
+                <>
+                  {menu}
+                  <div style={{ padding: 8 }}>
+                    <Button type="primary" block onClick={() => setCatModalOpen(true)}>+ Qo‘shish</Button>
+                  </div>
+                </>
+              )}
+            />
           </div>
 
           <Table
@@ -206,19 +205,28 @@ const ModalHarajatlar = ({ isOpen, onClose }) => {
         onCancel={() => setShowAddModal(false)}
         footer={null}
         centered
-        width={500}
+        width={520}
       >
         <Form layout="vertical" form={form}>
-          <Form.Item name="amount" label="💰 Summa" rules={[{ required: true, message: "Summani kiriting" }]}> 
+          <Form.Item name="amount" label="💰 Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
             <Input type="number" placeholder="Masalan: 25000" />
           </Form.Item>
 
-          <Form.Item name="category" label="📦 Kategoriya" rules={[{ required: true, message: "Kategoriya tanlang" }]}> 
-            <Select placeholder="Kategoriya tanlang">
-              {["Oziq-ovqat", "Transport", "Ijara", "Kommunal", "Boshqa"].map((cat) => (
-                <Option key={cat} value={cat}>{cat}</Option>
-              ))}
-            </Select>
+          <Form.Item name="category" label="📦 Kategoriya" rules={[{ required: true, message: "Kategoriya tanlang" }]}>
+            <Select
+              placeholder="Kategoriya tanlang"
+              loading={catsLoading}
+              options={categories.map(c => ({ label: c.name, value: c.name }))}
+              dropdownRender={(menu) => (
+                <>
+                  {menu}
+                  <Divider style={{ margin: 8 }} />
+                  <div style={{ padding: "0 8px 8px", textAlign: "right" }}>
+                    <Button type="primary" onClick={() => setCatModalOpen(true)}>+ Qo‘shish</Button>
+                  </div>
+                </>
+              )}
+            />
           </Form.Item>
 
           <Form.Item name="reason" label="📝 Sabab">
@@ -226,11 +234,26 @@ const ModalHarajatlar = ({ isOpen, onClose }) => {
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" onClick={handleAdd} block>
-              Qo‘shish
-            </Button>
+            <Button type="primary" onClick={handleAdd} block>Qo‘shish</Button>
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="Yangi kategoriya"
+        open={catModalOpen}
+        onCancel={() => { setCatModalOpen(false); setNewCatName(""); }}
+        onOk={handleCreateCategory}
+        okText={creatingCat ? "Saqlanmoqda..." : "Saqlash"}
+        confirmLoading={creatingCat}
+      >
+        <Input
+          autoFocus
+          placeholder="Kategoriya nomi"
+          value={newCatName}
+          onChange={(e) => setNewCatName(e.target.value)}
+          onPressEnter={(e) => e.preventDefault()}
+        />
       </Modal>
     </>
   );

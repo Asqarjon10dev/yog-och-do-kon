@@ -1,0 +1,9 @@
+// 📁 src/utils/formatDate.js
+import dayjs from "dayjs";
+
+const formatDate = (date) => {
+  if (!date) return "—";
+  return dayjs(date).format("DD.MM.YYYY HH:mm");
+};
+
+export default formatDate;      // default export

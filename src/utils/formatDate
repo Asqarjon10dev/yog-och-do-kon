@@ -1,9 +1,8 @@
-// 📁 src/utils/formatDate.js
-import dayjs from "dayjs";
-
+// 📁 utils/formatDate.js
 const formatDate = (date) => {
-  if (!date) return "—";
-  return dayjs(date).format("DD.MM.YYYY HH:mm");
+  // Masalan, sana formatlash
+  const newDate = new Date(date);
+  return newDate.toLocaleDateString(); // yoki o‘zbekcha formatda
 };
 
-export default formatDate;      // default export
+export default formatDate;

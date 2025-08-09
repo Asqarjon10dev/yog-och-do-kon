@@ -28,7 +28,8 @@ import {
 } from "../context/employeeApi";
 import { useNavigate } from "react-router-dom";
 import { CloseOutlined } from "@ant-design/icons";
-import formatDate from "../utils/formatDate";
+import formatDate from "../utils/formatDate";  // Yoki to‘g‘ri yo‘li bo‘yicha
+
 
 
 const ADVANCE_LIMIT_PERCENT = 50; // Tavsiya: oylikning 50%
@@ -210,8 +211,12 @@ const Ishchilar = () => {
     { title: "Summasi", dataIndex: "amount" },
     {
       title: "Vaqt",
-      render: (item) => formatDate(item.date),
-    },
+      render: (item) => {
+        const d = item?.date || item?.createdAt;
+        return d ? new Date(d).toLocaleString("uz-UZ", { hour12: false }) : "—";
+      },
+    }
+    
   ];
 
   const advanceHistoryColumns = [
@@ -231,8 +236,12 @@ const Ishchilar = () => {
     { title: "Izoh", dataIndex: "note" },
     {
       title: "Vaqt",
-      render: (item) => formatDate(item.date)
-    },
+      render: (item) => {
+        const d = item?.date || item?.createdAt;
+        return d ? new Date(d).toLocaleString("uz-UZ", { hour12: false }) : "—";
+      },
+    }
+    
   ];
 
   return (

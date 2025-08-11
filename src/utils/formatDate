@@ -1,8 +1,0 @@
-// 📁 utils/formatDate.js
-const formatDate = (date) => {
-  // Masalan, sana formatlash
-  const newDate = new Date(date);
-  return newDate.toLocaleDateString(); // yoki o‘zbekcha formatda
-};
-
-export default formatDate;

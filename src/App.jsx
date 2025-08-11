@@ -80,13 +80,14 @@ const App = () => {
 
           {/* 🔐 Ishchilar uchun faqat oylik sahifasi */}
           <Route
-            path="/oylik-tarixi"
-            element={
-              <PrivateRoute roles={["oylik", "dagavor", "menejer"]}>
-                <OylikTarixi />
-              </PrivateRoute>
-            }
-          />
+  path="/oylik-tarixi"
+  element={
+    <PrivateRoute roles={["employee"]} loginPath="/employee/login">
+      <OylikTarixi />
+    </PrivateRoute>
+  }
+/>
+
             <Route 
             path="/harajatlar"
             element={

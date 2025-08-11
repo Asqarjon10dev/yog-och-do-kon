@@ -1,78 +1,58 @@
 // 📁 src/pages/OylikTarixi.jsx
-import React from "react";
-import { Table, Typography, Tag } from "antd";
+import React, { useMemo } from "react";
+import { Table, Typography } from "antd";
 import {
   useGetSalaryHistoryQuery,
   useGetSalaryByEmployeeIdQuery,
 } from "../context/employeeApi";
-import  formatDate from "../utils/formatDate";
-
 
 const OylikTarixi = () => {
-  const role = localStorage.getItem("role");
+  const role = localStorage.getItem("role");          // "admin" | "employee" ...
   const employeeId = localStorage.getItem("employeeId");
 
-  // 🟢 HAR DOIM HOOK'lar chaqiriladi (shart ichida emas!)
+  // Har doim hooklar chaqiriladi
   const { data: allData, isLoading: isLoadingAll } = useGetSalaryHistoryQuery();
-  const {
-    data: employeeData,
-    isLoading: isLoadingEmployee,
-  } = useGetSalaryByEmployeeIdQuery(employeeId);
+  const { data: mineData, isLoading: isLoadingMine } =
+    useGetSalaryByEmployeeIdQuery(employeeId, { skip: !employeeId });
 
-  // 🟡 SHU YERDA role asosida tanlab olamiz
-  const data =
-    role === "admin" || role === "menejer" ? allData : employeeData;
-  const isLoading =
-    role === "admin" || role === "menejer"
-      ? isLoadingAll
-      : isLoadingEmployee;
+  // Admin hammasini ko‘radi, employee faqat o‘zini
+  const isAdmin = role === "admin";
+  const raw = isAdmin ? allData?.innerData : mineData?.innerData;
 
-  const roleColors = {
-    admin: "volcano",
-    menejer: "blue",
-    oylik: "green",
-    dagavor: "orange",
-  };
+  const rows = useMemo(() => (raw || []).map((r, i) => ({ ...r, key: r._id || i })), [raw]);
+  const loading = isAdmin ? isLoadingAll : isLoadingMine;
 
-  const columns = [
+  // Ishchi uchun faqat 2 ustun
+  const employeeColumns = [
+    { title: "Ism", render: (r) => r.employeeId?.fullName || "–" },
+    { title: "Ish turi", render: (r) => r.employeeId?.jobType?.toUpperCase() || "–" },
+    { title: "Oy", render: (r) => `${r.month}.${r.year}` },
+    { title: "Summasi (so‘m)", dataIndex: "amount" },
     {
-      title: "Ism",
-      render: (item) => item.employeeId?.fullName || "–",
+      title: "Berilgan sana",
+      render: (r) => (r?.date ? new Date(r.date).toLocaleString() : "–"),
     },
+  ];
+  
+  // Admin uchun xodim tafsilotlari ham ko‘rinadi
+  const adminColumns = [
+    { title: "Ism", render: (r) => r.employeeId?.fullName || "–" },
+    { title: "Telefon", render: (r) => r.employeeId?.phone || "–" },
+    { title: "Summasi (so‘m)", dataIndex: "amount" },
     {
-      title: "Telefon",
-      render: (item) => item.employeeId?.phone || "–",
+      title: "Sana",
+      render: (r) => (r?.date ? new Date(r.date).toLocaleString() : "–"),
     },
-    {
-      title: "Ish turi",
-      render: (item) =>
-        item.employeeId?.jobType ? (
-          <Tag color={roleColors[item.employeeId.jobType]}>
-            {item.employeeId.jobType.toUpperCase()}
-          </Tag>
-        ) : (
-          "–"
-        ),
-    },
-    {
-      title: "Summasi",
-      dataIndex: "amount",
-    },
-    {
-      title: "Vaqt",
-      render: (item) => formatDate(item.date),
-    }
   ];
 
   return (
     <div>
       <Typography.Title level={3}>Oylik tarixi</Typography.Title>
-
       <Table
-        columns={columns}
-        dataSource={data?.innerData || []}
-        loading={isLoading}
-        rowKey="_id"
+        columns={isAdmin ? adminColumns : employeeColumns}
+        dataSource={rows}
+        loading={loading}
+        rowKey="key"
         pagination={{ pageSize: 10 }}
       />
     </div>

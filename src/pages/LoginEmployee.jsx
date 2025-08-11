@@ -7,18 +7,20 @@ import { toast } from "react-toastify";
 
 const LoginEmployee = () => {
   const [login, { isLoading }] = useEmployeeLoginMutation();
-  const navigate = useNavigate();
 
+  const navigate = useNavigate();
   const onFinish = async (values) => {
     try {
       const res = await login(values).unwrap();
-      const { token, employeeId, jobType } = res.innerData;
+      const { token, employeeId, role, jobType } = res.innerData;
   
       localStorage.setItem("token", token);
       localStorage.setItem("employeeId", employeeId);
-      localStorage.setItem("role", jobType);
+      localStorage.setItem("role", role || "employee"); // ⬅️ yagona employee roli
+      localStorage.setItem("jobType", jobType || "");
   
-      if (["oylik", "dagavor", "menejer"].includes(jobType)) {
+      // Ishchi kirganda oylik tarixi sahifasiga
+      if (role === "employee") {
         navigate("/oylik-tarixi");
       } else {
         toast.error("Ruxsat etilmagan rol!");

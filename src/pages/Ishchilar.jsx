@@ -1,5 +1,7 @@
 // 📁 Ishchilar.jsx
 import React, { useMemo, useState } from "react";
+
+import { DatePicker } from "antd";
 import {
   Table,
   Typography,
@@ -24,11 +26,11 @@ import {
   useGetSalaryHistoryQuery,
   // ⬇️ Yangi hooklar (employeeApi da bo‘lishi kerak)
   useGiveAdvanceMutation,
+  useUpdateEmployeeSalaryMutation ,
   useGetAdvanceHistoryQuery,
 } from "../context/employeeApi";
 import { useNavigate } from "react-router-dom";
 import { CloseOutlined } from "@ant-design/icons";
-import formatDate from "../utils/formatDate";  // Yoki to‘g‘ri yo‘li bo‘yicha
 
 
 
@@ -36,6 +38,26 @@ const ADVANCE_LIMIT_PERCENT = 50; // Tavsiya: oylikning 50%
 
 const Ishchilar = () => {
   const navigate = useNavigate();
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [openEditSalary, setOpenEditSalary] = useState(false);
+const [editForm] = Form.useForm();
+const [updateSalary, { isLoading: isUpd }] = useUpdateEmployeeSalaryMutation();
+
+const openEdit = (row) => {
+  editForm.setFieldsValue({ id: row._id, salary: row.salary });
+  setOpenEditSalary(true);
+};
+
+const submitEdit = async () => {
+  const v = await editForm.validateFields();
+  const res = await updateSalary({ id: v.id, salary: v.salary }).unwrap();
+  if (res?.state) {
+    message.success("✅ Oylik yangilandi");
+    setOpenEditSalary(false);
+  } else {
+    message.error(res?.message || "Xatolik");
+  }
+};
 
   const { data: salaryHistory } = useGetSalaryHistoryQuery(undefined, {
     refetchOnFocus: true,
@@ -101,24 +123,33 @@ const Ishchilar = () => {
     }
   };
 
-  // ✅ Oylik berish
-  const handlePaySalary = async (values) => {
-    const selected = employees.find((e) => e._id === values.employeeId);
-    const amount = selected?.salary || 0;
-    const payload = { employeeId: values.employeeId, amount };
-    try {
-      const res = await paySalary(payload);
-      if (res?.data?.state) {
-        message.success("✅ Oylik berildi");
-        formSalary.resetFields();
-        setOpenSalaryModal(false);
-      } else {
-        message.error(res?.data?.message || "Xatolik: Oylik berilmadi");
-      }
-    } catch {
-      message.error("Server xatoligi");
+ // ✅ Oylik berish (KIRITILGAN SUMMA + OY/YIL yuboramiz)
+const handlePaySalary = async (values) => {
+  try {
+    const month = selectedMonth ? selectedMonth.month() + 1 : undefined; // 1..12
+    const year  = selectedMonth ? selectedMonth.year() : undefined;
+
+    const payload = {
+      employeeId: values.employeeId,
+      amount: values.amount,      // ← endi admin kiritadi
+      month,
+      year,
+    };
+
+    const res = await paySalary(payload).unwrap();
+    if (res?.state) {
+      message.success("✅ Oylik berildi");
+      formSalary.resetFields();
+      setSelectedMonth(null);
+      setOpenSalaryModal(false);
+    } else {
+      message.error(res?.message || "Xatolik: Oylik berilmadi");
     }
-  };
+  } catch (e) {
+    message.error("Server xatoligi");
+  }
+};
+
 
   // ✅ Avans berish (oylik olgan/olmaganidan qat’i nazar ruxsat)
   const handleGiveAdvance = async (values) => {
@@ -160,89 +191,43 @@ const Ishchilar = () => {
       render: (role) =>
         role ? <Tag color={roleColors[role]}>{String(role).toUpperCase()}</Tag> : null,
     },
-    { title: "Oylik", dataIndex: "salary" },
+    { title: "Oylik so'm", dataIndex: "salary"  },
     {
       title: "Harakat",
       render: (row) => (
         <Row gutter={8}>
-          <Col>
-            <Button
-              size="small"
-              onClick={() => {
-                setSelectedEmployee(row._id);
-                setOpenSalaryModal(true);
-                formSalary.setFieldsValue({ employeeId: row._id });
-              }}
-            >
-              Oylik
-            </Button>
-          </Col>
-          <Col>
-            <Button
-              size="small"
-              type="dashed"
-              onClick={() => {
-                setSelectedEmployee(row._id);
-                setOpenAdvanceModal(true);
-                formAdvance.setFieldsValue({ employeeId: row._id });
-              }}
-            >
-              Avans
-            </Button>
-          </Col>
+          {/* Oylik berish */}
+          <Col><Button size="small" onClick={() => { setOpenSalaryModal(true); formSalary.setFieldsValue({ employeeId: row._id }); }}>Oylik</Button></Col>
+          {/* Avans */}
+          {/* Oyligini o‘zgartirish */}
+          <Col><Button size="small" onClick={() => openEdit(row)}>Maosh</Button></Col>
         </Row>
       ),
-    },
+    }
+    
   ];
 
   const salaryHistoryColumns = [
-    {
-      title: "Ism",
-      render: (item) => item.employeeId?.fullName || "–",
-    },
-    {
-      title: "Telefon",
-      render: (item) => item.employeeId?.phone || "–",
-    },
-    {
-      title: "Ish turi",
-      render: (item) => item.employeeId?.jobType?.toUpperCase() || "–",
-    },
+    { title: "Ism", render: (r) => r.employeeId?.fullName || "–" },
+    { title: "Telefon", render: (r) => r.employeeId?.phone || "–" },
+    { title: "Ish turi", render: (r) => r.employeeId?.jobType?.toUpperCase() || "–" },
+  
+    // yangi: oy/yil (agar backend saqlasa)
+    { title: "Oy", render: (r) => (r.month && r.year ? `${r.month}.${r.year}` : "—") },
+  
     { title: "Summasi", dataIndex: "amount" },
-    {
-      title: "Vaqt",
-      render: (item) => {
-        const d = item?.date || item?.createdAt;
-        return d ? new Date(d).toLocaleString("uz-UZ", { hour12: false }) : "—";
-      },
-    }
-    
+    { title: "Vaqt", render: (r) => (r?.date ? new Date(r.date).toLocaleString("uz-UZ", { hour12:false }) : "—") },
   ];
-
+  
   const advanceHistoryColumns = [
-    {
-      title: "Ism",
-      render: (item) => item.employeeId?.fullName || "–",
-    },
-    {
-      title: "Telefon",
-      render: (item) => item.employeeId?.phone || "–",
-    },
-    {
-      title: "Ish turi",
-      render: (item) => item.employeeId?.jobType?.toUpperCase() || "–",
-    },
+    { title: "Ism", render: (r) => r.employeeId?.fullName || "–" },
+    { title: "Telefon", render: (r) => r.employeeId?.phone || "–" },
+    { title: "Ish turi", render: (r) => r.employeeId?.jobType?.toUpperCase() || "–" },
     { title: "Avans summasi", dataIndex: "amount" },
     { title: "Izoh", dataIndex: "note" },
-    {
-      title: "Vaqt",
-      render: (item) => {
-        const d = item?.date || item?.createdAt;
-        return d ? new Date(d).toLocaleString("uz-UZ", { hour12: false }) : "—";
-      },
-    }
-    
+    { title: "Vaqt", render: (r) => (r?.date ? new Date(r.date).toLocaleString("uz-UZ", { hour12:false }) : "—") },
   ];
+  
 
   return (
     <div>
@@ -362,55 +347,90 @@ const Ishchilar = () => {
           </Form.Item>
         </Form>
       </Modal>
+      <Modal
+  title="Ishchi oyligini o‘zgartirish"
+  open={openEditSalary}
+  onCancel={() => setOpenEditSalary(false)}
+  onOk={submitEdit}
+  confirmLoading={isUpd}
+  destroyOnClose
+>
+  <Form layout="vertical" form={editForm}>
+    <Form.Item name="id" hidden><Input /></Form.Item>
+    <Form.Item label="Yangi oylik (so‘m)" name="salary" rules={[{ required: true, message: "Oylikni kiriting" }]}>
+      <InputNumber style={{ width: "100%" }} min={0} step={1000} />
+    </Form.Item>
+  </Form>
+</Modal>
 
       {/* 💰 Oylik berish */}
-      <Modal
-        title=" Oylik berish"
-        open={openSalaryModal}
-        onCancel={() => setOpenSalaryModal(false)}
-        footer={false}
-        destroyOnClose
-      >
-        <Form layout="vertical" onFinish={handlePaySalary} form={formSalary}>
-          <Form.Item
-            name="employeeId"
-            label="Ishchini tanlang"
-            rules={[{ required: true, message: "Ishchini tanlang" }]}
-          >
-            <Select
-              showSearch
-              placeholder="Ism yoki tel..."
-              onChange={(val) => {
-                setSelectedEmployee(val);
-                formSalary.setFieldsValue({ employeeId: val });
-              }}
-              options={employees.map((e) => ({
-                label: `${e.fullName} | ${e.phone}`,
-                value: e._id,
-              }))}
-              optionFilterProp="label"
-            />
-          </Form.Item>
+<Modal
+  title="Oylik berish"
+  open={openSalaryModal}
+  onCancel={() => { setOpenSalaryModal(false); formSalary.resetFields(); setSelectedMonth(null); }}
+  footer={false}
+  destroyOnClose
+>
+  <Form layout="vertical" onFinish={handlePaySalary} form={formSalary}>
+    <Form.Item
+      name="employeeId"
+      label="Ishchini tanlang"
+      rules={[{ required: true, message: "Ishchini tanlang" }]}
+    >
+      <Select
+        showSearch
+        placeholder="Ism yoki tel..."
+        options={employees.map((e) => ({
+          label: `${e.fullName} | ${e.phone}`,
+          value: e._id,
+        }))}
+        optionFilterProp="label"
+      />
+    </Form.Item>
 
-          {selectedEmployee && (
-            <>
-              <Form.Item label="Oylik summasi">
-                <Input
-                  value={
-                    employees.find((e) => e._id === selectedEmployee)?.salary || 0
-                  }
-                  disabled
-                />
-              </Form.Item>
-              <Form.Item>
-                <Button type="primary" htmlType="submit" block>
-                  Berish
-                </Button>
-              </Form.Item>
-            </>
-          )}
-        </Form>
-      </Modal>
+    {/* Faqat ma’lumot uchun – hozirgi oyligi ko‘rinadi */}
+    <Form.Item shouldUpdate noStyle>
+      {() => {
+        const id = formSalary.getFieldValue("employeeId");
+        const emp = employees.find((e) => e._id === id);
+        return (
+          <Input
+            style={{ marginBottom: 12 }}
+            value={emp ? `Hozirgi oyligi: ${emp.salary} so‘m` : ""}
+            disabled
+          />
+        );
+      }}
+    </Form.Item>
+
+    {/* ✅ Admin o‘zi qancha berishni kiritadi */}
+    <Form.Item
+      name="amount"
+      label="Beriladigan summa (so‘m)"
+      rules={[{ required: true, message: "Summani kiriting" }]}
+    >
+      <InputNumber style={{ width: "100%" }} min={1} step={1000} />
+    </Form.Item>
+
+    {/* ✅ Qaysi oy uchun — Month picker */}
+    <Form.Item
+      label="Qaysi oy uchun"
+      tooltip="Oylik hisoblanayotgan oy"
+      required
+    >
+      <DatePicker
+        picker="month"
+        style={{ width: "100%" }}
+        onChange={(d) => setSelectedMonth(d)}
+      />
+    </Form.Item>
+
+    <Button type="primary" htmlType="submit" block>
+      Oylikni berish
+    </Button>
+  </Form>
+</Modal>
+
 
       {/* 💵 Avans berish */}
       <Modal
